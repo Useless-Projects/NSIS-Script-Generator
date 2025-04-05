@@ -444,7 +444,7 @@ def generate_nsis_script_from_config(config):
 
 # --- Main Execution ---
 if __name__ == "__main__":
-    print("--- NSIS Script Generator (Interactive) ---")
+    print("--- NSIS Script Generator ---")
     print("Please answer the following questions to configure your installer.")
     print("Press Enter to accept the default value in brackets [].\n")
 
