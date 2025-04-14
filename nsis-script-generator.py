@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# NSIS Script Generator 1.0.0
+# NSIS Script Generator 1.1.0
 # © 2025 Thibault Savenkoff
 
 import os
-import datetime
 import sys
-import subprocess # For optional compilation
-import re # For regex validation
+import datetime
+import re
+import subprocess
+import tkinter as tk
+from tkinter import filedialog, messagebox
 
 # --- Helper Functions for User Input ---
 
@@ -26,17 +28,17 @@ def ask_string(prompt, default=None, allow_empty=False): # <--- Make sure allow_
                 return user_input
             elif default is not None: # If user pressed Enter AND there is a default, return default
                 return default
-            # --- Ensure this block is present ---
             elif allow_empty: # If user pressed Enter, there is NO default, BUT empty is allowed
                 return "" # Return the empty string
-            # --- End Ensure this block is present ---
             else: # If user pressed Enter, there is NO default, and empty is NOT allowed
                 print("Input cannot be empty.")
         except EOFError:
             print("\nInput aborted.")
+            print("\nBye!")
             sys.exit(1)
         except KeyboardInterrupt:
              print("\nOperation cancelled by user.")
+             print("\nBye!")
              sys.exit(1)
 
 
@@ -96,9 +98,11 @@ def ask_path(prompt, default=None, check_exists=None, is_dir=False, allow_empty=
             return path # Path is valid or warning was ignored
         except EOFError:
              print("\nInput aborted.")
+             print("\nBye!")
              sys.exit(1)
         except KeyboardInterrupt:
             print("\nOperation cancelled by user.")
+            print("\nBye!")
             sys.exit(1)
 
 
@@ -119,9 +123,11 @@ def ask_bool(prompt, default=True):
             print("Please answer 'yes' or 'no' (or press Enter for default).")
         except EOFError:
              print("\nInput aborted.")
+             print("\nBye!")
              sys.exit(1)
         except KeyboardInterrupt:
             print("\nOperation cancelled by user.")
+            print("\nBye!")
             sys.exit(1)
 
 
@@ -159,9 +165,11 @@ def ask_choice(prompt, options, default=None):
             print("Invalid input. Please enter a number.")
         except EOFError:
              print("\nInput aborted.")
+             print("\nBye!")
              sys.exit(1)
         except KeyboardInterrupt:
             print("\nOperation cancelled by user.")
+            print("\nBye!")
             sys.exit(1)
 
 
@@ -203,9 +211,11 @@ def validate_product_version(prompt, app_version, default=None, allow_empty=Fals
                 print("Input cannot be empty.")
         except EOFError:
             print("\nInput aborted.")
+            print("\nBye!")
             sys.exit(1)
         except KeyboardInterrupt:
              print("\nOperation cancelled by user.")
+             print("\nBye!")
              sys.exit(1)
              
 
@@ -444,6 +454,10 @@ def generate_nsis_script_from_config(config):
 
 # --- Main Execution ---
 if __name__ == "__main__":
+    # Initialize Tkinter but hide the root window
+    root = tk.Tk()
+    root.withdraw()
+
     print("--- NSIS Script Generator ---")
     print("Please answer the following questions to configure your installer.")
     print("Press Enter to accept the default value in brackets [].\n")
@@ -451,7 +465,7 @@ if __name__ == "__main__":
     config = {}
 
     # --- Application Info ---
-    print("\n--- Application Information ---")
+    print("\n--- Basic Information ---")
     config['app_name'] = ask_string("Application Name", default="My Application")
     config['app_version'] = ask_string("Application Version (Only Numbers!)", default="1.0.0")
     config['product_version'] = validate_product_version(
@@ -460,59 +474,85 @@ if __name__ == "__main__":
         default=f"1.0.0.0"
     )
     config['publisher'] = ask_string("Publisher Name", default="My Company")
-    config['branding'] = ask_string("Branding Text (For installer window)", default=f"{config['publisher']} - {config['app_name']} v{config['app_version']}")
     config['website'] = ask_string("Application Website (optional, for Add/Remove Programs)", default="")
 
     # --- File Paths ---
     print("\n--- File Paths ---")
-    config['source_dir'] = ask_path(
-        "Directory containing ALL files/folders to install",
-        check_exists='require', # Must exist
-        is_dir=True
-    )
-    # Try to find a likely exe in the source dir for a default
-    potential_exes = []
-    try:
-        potential_exes = [f for f in os.listdir(config['source_dir']) if f.lower().endswith('.exe')]
-    except OSError as e:
-         print(f"Warning: Could not list source directory '{config['source_dir']}': {e}")
 
-    main_exe_default = potential_exes[0] if potential_exes else None
+    # Use Tkinter for source directory - Directly open dialog
+    print("Select the directory containing ALL files/folders to install...")
+    source_dir_selected = filedialog.askdirectory(title="Select Source Directory")
+    if not source_dir_selected:
+        print("Source directory selection cancelled. Exiting.")
+        sys.exit(1)
+    config['source_dir'] = os.path.normpath(source_dir_selected)
+    print(f"    Source Directory: {config['source_dir']}")
 
-    config['main_executable'] = ask_path(
-        f"Main executable filename (must be inside '{os.path.basename(config['source_dir'])}')",
-        default=main_exe_default,
-        check_exists=None, # We'll check existence relative to source_dir below
-        is_dir=False
-    )
-     # Validate main executable exists within source_dir
+    # Directly open file dialog for main executable
+    print("Select the main executable file (must be inside the source directory)...")
     main_exe_full_path = None
-    if config.get('main_executable'):
-         main_exe_full_path = os.path.join(config['source_dir'], config['main_executable'])
-         if not os.path.exists(main_exe_full_path) or not os.path.isfile(main_exe_full_path):
-              print(f"Warning: Main executable '{config.get('main_executable', '')}' was not found inside '{config['source_dir']}'. Shortcuts/Icons might be broken.")
+    exe_selected = filedialog.askopenfilename(
+        title="Select Main Executable",
+        initialdir=config['source_dir'], # Start in the source directory
+        filetypes=[("Executable files", "*.exe"), ("All files", "*.*")]
+    )
+    if exe_selected:
+        # Validate that the selected file is within the source directory
+        if os.path.dirname(os.path.normpath(exe_selected)) == config['source_dir']:
+            config['main_executable'] = os.path.basename(exe_selected)
+            main_exe_full_path = exe_selected # Store full path for potential later use
+            print(f"    Selected Main Executable: {config['main_executable']}")
+        else:
+            messagebox.showerror("Error", "The selected executable must be inside the source directory.")
+            print("Invalid executable selection (not in source directory). Proceeding without a main executable.")
+            config['main_executable'] = None
+    else:
+        print("Main executable selection cancelled. Proceeding without a main executable.")
+        config['main_executable'] = None
 
-    config['license_file'] = ask_path(
-        "Path to license file ('.txt' or '.rtf', leave blank if none)",
-        default="",
-        check_exists='warn', # Warn if specified but not found
-        is_dir=False,
-        allow_empty=True
+
+    # Directly open file dialog for license file
+    print("Select the license file ('.txt' or '.rtf', optional)...")
+    license_selected = filedialog.askopenfilename(
+        title="Select License File (Optional)",
+        filetypes=[("Text files", "*.txt"), ("Rich Text Format", "*.rtf"), ("All files", "*.*")]
     )
-    config['installer_icon'] = ask_path(
-        "Path to installer icon file ('.ico', leave blank if none)",
-        default="",
-        check_exists='warn',
-        is_dir=False,
-        allow_empty=True
+    if license_selected:
+        config['license_file'] = os.path.normpath(license_selected)
+        print(f"Selected License File: {config['license_file']}")
+    else:
+        print("License file selection cancelled or skipped.")
+        config['license_file'] = "" # Set to empty string if cancelled
+
+
+    # Directly open file dialog for installer icon
+    print("Select the installer icon file ('.ico', optional)...")
+    icon_selected = filedialog.askopenfilename(
+        title="Select Installer Icon (Optional)",
+        filetypes=[("Icon files", "*.ico"), ("All files", "*.*")]
     )
-    config['uninstaller_icon'] = ask_path(
-        "Path to uninstaller icon file ('.ico', leave blank for default/none)",
-        default="",
-        check_exists='warn',
-        is_dir=False,
-        allow_empty=True
+    if icon_selected:
+        config['installer_icon'] = os.path.normpath(icon_selected)
+        print(f"Selected Installer Icon: {config['installer_icon']}")
+    else:
+        print("Installer icon selection cancelled or skipped.")
+        config['installer_icon'] = "" # Set to empty string if cancelled
+
+
+    # Directly open file dialog for uninstaller icon
+    print("Select the uninstaller icon file ('.ico', optional, defaults to installer icon or none)...")
+    unicon_selected = filedialog.askopenfilename(
+        title="Select Uninstaller Icon (Optional)",
+        filetypes=[("Icon files", "*.ico"), ("All files", "*.*")]
     )
+    if unicon_selected:
+        config['uninstaller_icon'] = os.path.normpath(unicon_selected)
+        print(f"Selected Uninstaller Icon: {config['uninstaller_icon']}")
+    else:
+        print("Uninstaller icon selection cancelled or skipped.")
+        config['uninstaller_icon'] = "" # Set to empty string if cancelled
+
+
     default_output_name = f"{config['app_name'].replace(' ', '_')}_v{config['app_version']}_Setup.exe"
     config['output_installer_name'] = ask_string("Filename for the final installer executable", default=default_output_name)
     if not config['output_installer_name'].lower().endswith(".exe"):
@@ -521,8 +561,9 @@ if __name__ == "__main__":
 
     # --- Installation Options ---
     print("\n--- Installation Options ---")
+
     config['install_dir_name'] = ask_string(
-        "Installation folder name (e.g., 'My App' under Program Files)",
+        "Installation folder name (e.g., 'My App' under Program Files/Local App Data)",
         default=config['app_name']
     )
     config['request_admin'] = ask_bool("Require Administrator privileges (needed for Program Files)?", default=True)
@@ -559,7 +600,7 @@ if __name__ == "__main__":
 
     # --- Registry ---
     print("\n--- Registry ---")
-    # Generate reasonably unique defaults
+
     app_name_safe = ''.join(filter(str.isalnum, config['app_name']))
     publisher_safe = ''.join(filter(str.isalnum, config['publisher']))
     default_uninstall_key = f"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{app_name_safe}"
@@ -568,10 +609,9 @@ if __name__ == "__main__":
     default_install_path_key = f"Software\\{publisher_safe}\\{app_name_safe}"
     config['install_path_reg_key'] = ask_string("Registry key to store Installation Path (optional but recommended)", default=default_install_path_key)
 
-    # --- UI / Language ---
-    print("\n--- UI / Language ---")
+    # --- Language ---
+    print("\n--- Language ---")
 
-    # --- Language Selection (Modified Block) ---
     selected_languages = []
     print("Enter the installer languages one by one.")
     print("These MUST match NSIS language file names (e.g., English, German, French).")
@@ -604,33 +644,44 @@ if __name__ == "__main__":
             print(f"'{next_lang}' is already in the list.")
 
     config['selected_languages'] = selected_languages # Store the list
-    # --- End of Language Selection Block ---
 
-    # --- Continue with other UI questions ---
+    # --- UI ---
+    print("\n--- UI ---")
+
+    config['branding'] = ask_string("Branding Text", default=f"{config['publisher']} - {config['app_name']} v{config['app_version']}")
     config['show_welcome_page'] = ask_bool("Show Welcome page?", default=True)
-    # Check license file existence *before* asking about the page
+    # Check license file existence *after* potential dialog selection
     license_exists = config.get('license_file') and os.path.exists(config['license_file'])
     if license_exists:
         config['show_license_page'] = ask_bool("Show License page?", default=True)
     else:
-        if config.get('license_file'): # Only warn if they provided a non-existent path
-             print(f"(License file '{config['license_file']}' not found, skipping License page option)")
-        config['show_license_page'] = False # Force false if no valid file
+        # No need to warn here as the user explicitly cancelled or didn't select
+        config['show_license_page'] = False # Force false if no valid file selected
     config['show_directory_page'] = ask_bool("Show Directory selection page?", default=True)
     config['show_finish_page'] = ask_bool("Show Finish page?", default=True)
 
 
     # --- Generate Script ---
     print("\n--- Generating Script ---")
+
     nsis_script_content = generate_nsis_script_from_config(config)
 
     if nsis_script_content:
         default_nsi_filename = f"{config['app_name'].lower().replace(' ', '_').replace('.', '')}.nsi"
-        nsi_output_file = ask_string("Enter filename for the generated NSIS script", default=default_nsi_filename)
 
-        # Ensure filename ends with .nsi
-        if not nsi_output_file.lower().endswith(".nsi"):
-            nsi_output_file += ".nsi"
+        # Use Tkinter Save As dialog
+        print("Select where to save the generated NSIS script...")
+        nsi_output_file = filedialog.asksaveasfilename(
+            title="Save NSIS Script As",
+            initialfile=default_nsi_filename,
+            defaultextension=".nsi",
+            filetypes=[("NSIS Script", "*.nsi"), ("All Files", "*.*")]
+        )
+
+        if not nsi_output_file:
+            print("Save operation cancelled. Exiting.")
+            print("\nBye!")
+            sys.exit(1)
 
         try:
             with open(nsi_output_file, "w", encoding="utf-8", newline='\r\n') as f: # Use Windows line endings for NSIS
@@ -667,16 +718,21 @@ if __name__ == "__main__":
                 except FileNotFoundError:
                     print("\nError: 'makensis.exe' command not found.")
                     print("Ensure NSIS is installed and 'makensis.exe' is in your system's PATH environment variable.")
+                    messagebox.showerror("Compilation Error", "'makensis.exe' command not found.\nEnsure NSIS is installed and in your system's PATH.")
                 except Exception as e:
                     print(f"\nAn error occurred during compilation: {e}")
+                    messagebox.showerror("Compilation Error", f"An error occurred during compilation:\n{e}")
             else:
                  print("\nTo compile the script manually, open a terminal/command prompt,")
                  print("navigate to this directory, and run:")
                  print(f"  makensis \"{nsi_output_file}\"")
+                 print("\nBye!")
 
         except IOError as e:
             print(f"\nError writing file '{nsi_output_file}': {e}", file=sys.stderr)
+            messagebox.showerror("File Error", f"Error writing file '{nsi_output_file}':\n{e}")
             sys.exit(1)
     else:
         print("\nNSIS script generation failed due to errors.", file=sys.stderr)
+        messagebox.showerror("Generation Error", "NSIS script generation failed. Check console output for details.")
         sys.exit(1)
