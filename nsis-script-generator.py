@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# NSIS Script Generator 1.1.0
+# NSIS Script Generator 1.1.1
 # © 2025 Thibault Savenkoff
 
 import os
@@ -222,7 +222,7 @@ def validate_product_version(prompt, app_version, default=None, allow_empty=Fals
 # --- NSIS Template ---
 # Uses Python's f-string formatting. Variables like {app_name} are placeholders.
 NSI_TEMPLATE = """
-; NSIS script generated with NSIS Script Generator
+; NSIS script generated with NSIS Script Generator (https://github.com/Useless-Projects/NSIS-Script-Generator)
 ; © {current_year} Thibault Savenkoff
 ; Generated on: {generation_date}
 
@@ -486,7 +486,7 @@ if __name__ == "__main__":
         print("Source directory selection cancelled. Exiting.")
         sys.exit(1)
     config['source_dir'] = os.path.normpath(source_dir_selected)
-    print(f"    Source Directory: {config['source_dir']}")
+    print(f"Source Directory: {config['source_dir']}")
 
     # Directly open file dialog for main executable
     print("Select the main executable file (must be inside the source directory)...")
@@ -501,7 +501,7 @@ if __name__ == "__main__":
         if os.path.dirname(os.path.normpath(exe_selected)) == config['source_dir']:
             config['main_executable'] = os.path.basename(exe_selected)
             main_exe_full_path = exe_selected # Store full path for potential later use
-            print(f"    Selected Main Executable: {config['main_executable']}")
+            print(f"Selected Main Executable: {config['main_executable']}")
         else:
             messagebox.showerror("Error", "The selected executable must be inside the source directory.")
             print("Invalid executable selection (not in source directory). Proceeding without a main executable.")
